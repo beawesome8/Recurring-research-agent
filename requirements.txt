@@ -1,0 +1,11 @@
+langgraph
+langchain
+langchain-anthropic
+langchain-community
+chromadb
+tavily-python
+apscheduler
+fastapi
+uvicorn
+httpx
+python-dotenv
