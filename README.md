@@ -67,6 +67,18 @@ The agent is exposed as a service, not just a script:
 
 Interactive docs available at `/docs` once running.
 
+## API costs
+
+This runs on pay-as-you-go APIs, no fixed infrastructure cost, but it's worth knowing what a real run actually costs rather than treating "uses an LLM" as a black box.
+
+| Service | Pricing | Cost per run |
+|---|---|---|
+| Claude Sonnet 4.6 (synthesis + planning) | $3 / $15 per million input/output tokens | ~$0.02 |
+| Tavily search | 1,000 free searches/month, then $0.008/search | $0 (within free tier at this cadence) |
+
+A single run makes two LLM calls (query planning, then diff synthesis against ~9 search results) and 2-3 search queries. At a 6-hour schedule, that's roughly 120 runs/month, about **$2.40/month in Claude API spend**, and around 360 Tavily searches/month, comfortably inside the free tier. Tracking multiple topics scales linearly: each additional topic on the same schedule adds roughly the same per-run cost again.
+
+The cheapest lever available if cost ever mattered at scale: swap `claude-sonnet-4-6` for `claude-haiku-4-5` ($1/$5 per million tokens) for the planner node specifically, since query generation is a much simpler task than the diff synthesis and doesn't need the larger model's reasoning depth. 
 
 ## Running it
 
