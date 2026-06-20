@@ -7,9 +7,19 @@ TOPICS = [
     "AI Engineer hiring trends Germany",
 ]
 
+from agent.memory import init_db, get_all_topics
+
+from apscheduler.schedulers.blocking import BlockingScheduler
+from agent.graph import build_graph
+from agent.memory import init_db, get_all_topics
+
 def run_pipeline_for_all_topics():
     app = build_graph()
-    for topic in TOPICS:
+    topics = get_all_topics()
+    if not topics:
+        print("No topics registered yet.")
+        return
+    for topic in topics:
         print(f"\n=== Running pipeline for: {topic} ===")
         initial_state = {
             "topic": topic, "queries": [], "search_results": [],

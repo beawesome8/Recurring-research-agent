@@ -31,9 +31,14 @@ def init_db():
             sources_json TEXT
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS topics (
+            topic TEXT PRIMARY KEY,
+            added_at TEXT NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
-
 def save_run(topic: str, summary: str, sources: list):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -56,6 +61,35 @@ def get_last_run(topic: str):
     if row is None:
         return None
     return {"run_date": row[0], "summary": row[1], "sources": json.loads(row[2])}
+
+def add_topic(topic: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR IGNORE INTO topics (topic, added_at) VALUES (?, ?)",
+        (topic, datetime.now().isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+def get_all_topics():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT topic FROM topics")
+    rows = cursor.fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+def get_topic_history(topic: str, limit: int = 10):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT run_date, summary FROM research_runs WHERE topic = ? ORDER BY run_date DESC LIMIT ?",
+        (topic, limit)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"run_date": r[0], "summary": r[1]} for r in rows]
 
 def embed_finding(topic: str, summary: str, run_date: str):
     collection.add(
