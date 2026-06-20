@@ -5,6 +5,7 @@ from tavily import TavilyClient
 from langgraph.graph import StateGraph, END
 from agent.memory import init_db, get_last_run, query_similar_findings, save_run, embed_finding
 from datetime import datetime
+from agent.notifier import send_telegram_message
 # agent/graph.py
 
 from typing import TypedDict, List
@@ -110,7 +111,7 @@ Start your response with either "CHANGES_FOUND: yes" or "CHANGES_FOUND: no" on t
 
     response = llm.invoke(prompt)
     content = response.content
-
+    
     has_changes = True
     if content.strip().startswith("CHANGES_FOUND: no"):
         has_changes = False
@@ -123,7 +124,22 @@ def save_memory_node(state: ResearchState) -> dict:
     sources = [{"title": r["title"], "url": r["url"]} for r in state["search_results"]]
 
     save_run(topic, summary, sources)
-    embed_finding(topic, summary, run_date=datetime.now().isoformat())
+
+    if state["has_changes"]:
+        embed_finding(topic, summary, run_date=datetime.now().isoformat())
+
+    return {}
+
+def notify_node(state: ResearchState) -> dict:
+    topic = state["topic"]
+    summary = state["summary"]
+
+    cleaned = summary.split("CHANGES_FOUND:", 1)[-1]
+    if cleaned.startswith(" yes") or cleaned.startswith(" no"):
+        cleaned = cleaned.split("\n", 1)[-1].strip()
+
+    message = f"Research update: {topic}\n\n{cleaned[:3500]}"
+    result = send_telegram_message(message)
 
     return {}
 
@@ -135,16 +151,25 @@ def build_graph():
     graph.add_node("memory_retrieval", memory_retrieval_node)
     graph.add_node("synthesis", synthesis_node)
     graph.add_node("save_memory", save_memory_node)
+    graph.add_node("notify", notify_node)
 
     graph.set_entry_point("planner")
     graph.add_edge("planner", "search")
     graph.add_edge("search", "memory_retrieval")
     graph.add_edge("memory_retrieval", "synthesis")
     graph.add_edge("synthesis", "save_memory")
-    graph.add_edge("save_memory", END)
+
+    def route_after_save(state):
+        return "notify" if state["has_changes"] else "skip_notify"
+    
+    graph.add_conditional_edges(
+    "save_memory",
+    route_after_save,
+    {"notify": "notify", "skip_notify": END}
+    )
+    graph.add_edge("notify", END)
 
     return graph.compile()
-
 if __name__ == "__main__":
     init_db()
     app = build_graph()
@@ -155,8 +180,7 @@ if __name__ == "__main__":
         "summary": "", "has_changes": True
     }
     final_state = app.invoke(initial_state)
-
-    print("\n--- HAS CHANGES:", final_state["has_changes"], "---")
-    print(final_state["summary"])
+    print("HAS CHANGES:", final_state["has_changes"])
+    print("Check your Telegram now.")
     
     

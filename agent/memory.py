@@ -65,11 +65,17 @@ def embed_finding(topic: str, summary: str, run_date: str):
     )
 
 def query_similar_findings(topic: str, query_text: str, n_results: int = 3):
-    results = collection.query(
-        query_texts=[query_text],
-        n_results=n_results,
-        where={"topic": topic}
-    )
+    available = collection.count()
+    if available == 0:
+        return []
+    try:
+        results = collection.query(
+            query_texts=[query_text],
+            n_results=min(n_results, available),
+            where={"topic": topic}
+        )
+    except Exception:
+        return []
     matches = []
     if results["documents"] and results["documents"][0]:
         for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
